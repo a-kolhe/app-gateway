@@ -1,0 +1,35 @@
+server:
+  port: 8082
+  address: 0.0.0.0
+
+spring:
+  main:
+    web-application-type: reactive
+
+  application:
+    name: APP-GATEWAY
+
+  cloud:
+    gateway:
+      server:
+        webflux:
+          routes:
+            - id: swiggy-app
+              uri: http://swiggy-app:8080
+              predicates:
+                - Path=/swiggy/**
+              filters:
+                - AuthenticationFilter
+
+            - id: restaurant-service
+              uri: http://restaurant-service:8083
+              predicates:
+                - Path=/restaurant/**
+              filters:
+                - AuthenticationFilter
+
+            - id: auth-service
+              uri: http://auth-service:8081
+              predicates:
+                - Path=/auth/**
+              filters: []
