@@ -1,11 +1,14 @@
 package com.working.app_gateway.filter;
 
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cloud.gateway.filter.GatewayFilter;
 import org.springframework.cloud.gateway.filter.factory.AbstractGatewayFilterFactory;
 import org.springframework.core.io.buffer.DataBuffer;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 
@@ -16,9 +19,6 @@ import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
 import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Mono;
-
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
 
 
 @Component
@@ -55,6 +55,13 @@ public class AuthenticationFilter extends AbstractGatewayFilterFactory<Authentic
 //                    //REST call to AUTH service
 //                    template.getForObject("http://IDENTITY-SERVICE//validate?token" + authHeader, String.class);
 					jwtUtil.validateToken(authHeader);
+                    List<String> roles = jwtUtil.getRoles(authHeader);
+                    String path = exchange.getRequest().getPath().toString();
+                    if (!hasRequiredRole(path, roles)) {
+                        log.warn("Access denied to path '{}' for roles {}", path, roles);
+                        return unauthorizedResponse(exchange, "Access denied for your role");
+                    }
+                    log.info("Authorized request for path '{}' with roles: {}", path, roles);
 
 				} catch (ExpiredJwtException  e) {
 				    log.warn("JWT expired: {}", e.getMessage());
@@ -66,7 +73,7 @@ public class AuthenticationFilter extends AbstractGatewayFilterFactory<Authentic
 
 					// TODO: handle exception
 				}catch (Exception e3) {
-					log.error("Exception : {}",e3.getMessage(),e);
+					log.error("Exception : {}",e3.getMessage(),e3);
 				}
 			}
 			return chain.filter(exchange);
@@ -81,6 +88,11 @@ public class AuthenticationFilter extends AbstractGatewayFilterFactory<Authentic
 	    return exchange.getResponse().writeWith(Mono.just(buffer));
 	}
 
+	   private boolean hasRequiredRole(String path, List<String> roles) {
+	        if (path.startsWith("/partner")) return roles.contains("ROLE_PARTNER");
+	        if (path.startsWith("/user")) return roles.contains("ROLE_USER");
+	        return true; // Allow all other paths
+	    }
 
 	public static class Config {
 
